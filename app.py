@@ -18,6 +18,10 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "prepmate_jso_secret")
 
+# In-memory job status tracker {sid: "processing" | "done" | "error"}
+# Falls back to checking Supabase prep_pack for cross-worker safety
+_job_status = {}
+
 # ─────────────────────────────────────────
 # SUPABASE CLIENT
 # ─────────────────────────────────────────
@@ -183,18 +187,20 @@ def loading():
 # ─────────────────────────────────────────
 def _run_gemini_background(sid, profile, cv_text, intent):
     """Runs all Gemini calls in a daemon thread — never blocks HTTP workers."""
+    _job_status[sid] = "processing"
+    print(f"[BG] START sid={sid[:8]}", flush=True)
     try:
-        # Mark processing started
-        save_all(sid, {"status": "processing"})
-
-        # Calls 1 & 2 are independent — run in parallel
         results = {}
 
         def _risk():
+            print("[BG] risk_signal_detector start", flush=True)
             results["risk"] = run_risk_signal_detector(profile, cv_text)
+            print("[BG] risk_signal_detector done", flush=True)
 
         def _market():
+            print("[BG] market_pulse start", flush=True)
             results["market"] = run_market_pulse(profile)
+            print("[BG] market_pulse done", flush=True)
 
         t1 = threading.Thread(target=_risk)
         t2 = threading.Thread(target=_market)
@@ -205,27 +211,31 @@ def _run_gemini_background(sid, profile, cv_text, intent):
 
         risk_signals = results.get("risk", {})
         market_pulse = results.get("market", {})
+        print("[BG] parallel calls done — starting pack_generator", flush=True)
 
-        # Calls 3 & 4 depend on the above
         prep_pack = run_pack_generator(
             profile, cv_text, intent, risk_signals, market_pulse
         )
-        quality_result = run_quality_checker(profile, prep_pack, intent)
+        print("[BG] pack_generator done — starting quality_checker", flush=True)
 
-        # Auto-fix flagged questions
+        quality_result = run_quality_checker(profile, prep_pack, intent)
+        print("[BG] quality_checker done", flush=True)
+
         prep_pack, quality_result = apply_quality_fixes(prep_pack, quality_result)
 
-        # Persist everything + mark done
         save_all(sid, {
             "risk_signals": risk_signals,
             "market_pulse": market_pulse,
             "prep_pack": prep_pack,
-            "quality_result": quality_result,
-            "status": "done"
+            "quality_result": quality_result
         })
+        _job_status[sid] = "done"
+        print(f"[BG] DONE sid={sid[:8]}", flush=True)
     except Exception as e:
-        print(f"Background processing error: {e}")
-        save_all(sid, {"status": "error"})
+        import traceback
+        print(f"[BG] ERROR: {e}", flush=True)
+        traceback.print_exc()
+        _job_status[sid] = "error"
 
 
 # ─────────────────────────────────────────
@@ -238,18 +248,24 @@ def start_processing():
         return jsonify({"error": "no_profile"}), 400
 
     sid = get_session_id()
+
+    # Don't re-start if already tracked in memory
+    mem_status = _job_status.get(sid)
+    if mem_status in ("processing", "done"):
+        return jsonify({"status": mem_status})
+
+    # Or if prep_pack already exists in Supabase (e.g. page refresh)
     row = load_all(sid)
+    if row.get("prep_pack"):
+        _job_status[sid] = "done"
+        return jsonify({"status": "done"})
+
     profile = row.get("profile")
     cv_text = row.get("cv_text") or ""
     intent = row.get("intent") or "Build my overall job search strategy"
 
     if not profile:
         return jsonify({"error": "no_profile"}), 400
-
-    # Don't re-start if already running or done
-    current_status = row.get("status")
-    if current_status in ("processing", "done"):
-        return jsonify({"status": current_status})
 
     t = threading.Thread(
         target=_run_gemini_background,
@@ -270,14 +286,23 @@ def status():
         return jsonify({"status": "no_session"})
 
     sid = get_session_id()
-    row = load_all(sid)
-    current_status = row.get("status", "idle")
 
-    if current_status == "done":
+    # Check in-memory first (fast path — same worker)
+    mem_status = _job_status.get(sid)
+    if mem_status == "done":
+        session["has_results"] = True
+        return jsonify({"status": "done", "redirect": url_for("preppack")})
+    if mem_status == "error":
+        return jsonify({"status": "error"})
+
+    # Fallback: check Supabase for prep_pack (cross-worker safe)
+    row = load_all(sid)
+    if row.get("prep_pack"):
+        _job_status[sid] = "done"
         session["has_results"] = True
         return jsonify({"status": "done", "redirect": url_for("preppack")})
 
-    return jsonify({"status": current_status})
+    return jsonify({"status": mem_status or "processing"})
 
 
 # ─────────────────────────────────────────
