@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}PrepMate — What do you want from this session?{% endblock %}
+{% block step2 %}active{% endblock %}
+
+{% block content %}
+<div class="container" style="padding: 48px 24px;">
+
+  <!-- Steps Bar -->
+  <div class="steps-bar">
+    <div class="step-item done">
+      <div class="step-num">1</div>
+      <span>Profile</span>
+    </div>
+    <div class="step-line"></div>
+    <div class="step-item active">
+      <div class="step-num">2</div>
+      <span>Intent</span>
+    </div>
+    <div class="step-line"></div>
+    <div class="step-item">
+      <div class="step-num">3</div>
+      <span>Analysis</span>
+    </div>
+    <div class="step-line"></div>
+    <div class="step-item">
+      <div class="step-num">4</div>
+      <span>Prep Pack</span>
+    </div>
+  </div>
+
+  <div class="section-header text-center">
+    <div class="section-header__eyebrow">Step 2 of 4 — Intent Detector</div>
+    <h1 class="section-header__title">What do you want from<br/>this session?</h1>
+    <p class="section-header__sub" style="margin: 0 auto;">
+      Your answer calibrates your entire preparation pack.
+      PrepMate generates completely different content based on your declared intent.
+    </p>
+  </div>
+
+  <form method="POST" action="/intent" id="intentForm">
+    <div class="intent-grid">
+
+      <div class="intent-option">
+        <input type="radio" name="intent" id="intent1"
+               value="Fix my CV and positioning — I want to improve my CV score, address keyword gaps, and strengthen how I present myself to recruiters." />
+        <label class="intent-card" for="intent1">
+          <div class="intent-card__icon">📝</div>
+          <div class="intent-card__title">Fix My CV & Positioning</div>
+          <div class="intent-card__desc">
+            Improve CV score, address keyword gaps, strengthen recruiter visibility
+          </div>
+        </label>
+      </div>
+
+      <div class="intent-option">
+        <input type="radio" name="intent" id="intent2"
+               value="Understand the job market — I want to know what is happening in my target role market, which skills are trending, and where the best opportunities are." />
+        <label class="intent-card" for="intent2">
+          <div class="intent-card__icon">📡</div>
+          <div class="intent-card__title">Understand the Job Market</div>
+          <div class="intent-card__desc">
+            Market trends, trending skills, active hiring opportunities in my field
+          </div>
+        </label>
+      </div>
+
+      <div class="intent-option">
+        <input type="radio" name="intent" id="intent3"
+               value="Prepare for interviews I already have — I want to practice articulation, prepare STAR method answers, and get ready for specific interviews coming up." />
+        <label class="intent-card" for="intent3">
+          <div class="intent-card__icon">🎤</div>
+          <div class="intent-card__title">Prepare for Interviews</div>
+          <div class="intent-card__desc">
+            Interview articulation, STAR method prep, role-specific question practice
+          </div>
+        </label>
+      </div>
+
+      <div class="intent-option">
+        <input type="radio" name="intent" id="intent4"
+               value="Build my overall job search strategy — I want to reset my approach, activate JSO features I haven't used, and build a clear action plan." />
+        <label class="intent-card" for="intent4">
+          <div class="intent-card__icon">🗺️</div>
+          <div class="intent-card__title">Build My Job Search Strategy</div>
+          <div class="intent-card__desc">
+            Strategic reset, activate JSO features, build a clear 3-week action plan
+          </div>
+        </label>
+      </div>
+
+    </div>
+
+    <!-- Error message -->
+    <div id="intentError"
+         style="display:none; color:var(--red); text-align:center;
+                margin-top:16px; font-size:14px;">
+      ⚠️ Please select an intent to continue.
+    </div>
+
+    <div style="display:flex; gap:12px; justify-content:space-between;
+                align-items:center; margin-top:32px;">
+      <a href="/upload" class="btn btn--outline">← Back</a>
+      <button type="button" class="btn btn--primary btn--lg" onclick="submitIntent()">
+        Generate My Prep Pack →
+      </button>
+    </div>
+  </form>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function submitIntent() {
+    const selected = document.querySelector('input[name="intent"]:checked');
+    if (!selected) {
+      document.getElementById('intentError').style.display = 'block';
+      return;
+    }
+    document.getElementById('intentError').style.display = 'none';
+    document.getElementById('intentForm').submit();
+  }
+
+  // Visual feedback on select
+  document.querySelectorAll('input[name="intent"]').forEach(radio => {
+    radio.addEventListener('change', function() {
+      document.getElementById('intentError').style.display = 'none';
+    });
+  });
+</script>
+{% endblock %}

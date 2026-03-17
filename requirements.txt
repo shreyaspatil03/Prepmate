@@ -1,0 +1,8 @@
+flask
+python-dotenv
+PyPDF2
+fpdf2
+requests
+supabase
+google-generativeai
+gunicorn

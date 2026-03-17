@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}PrepMate — Generating Your Prep Pack{% endblock %}
+{% block step3 %}active{% endblock %}
+
+{% block content %}
+<div class="loading-screen">
+
+  <div style="margin-bottom:8px;">
+    <span class="badge badge--blue">Gemini AI Processing</span>
+  </div>
+
+  <h2 style="font-size:24px; margin-bottom:8px; font-family:'Syne',sans-serif;">
+    Generating Your Prep Pack
+  </h2>
+  <p style="color:var(--subtle); font-size:14px; margin-bottom:32px;">
+    PrepMate is reading your JSO profile and building your personalized pack...
+  </p>
+
+  <div class="loading-spinner"></div>
+
+  <ul class="loading-steps" id="loadingSteps">
+    <li class="loading-step" id="step1">
+      <div class="loading-step__dot"></div>
+      Reading your JSO career profile data
+    </li>
+    <li class="loading-step" id="step2">
+      <div class="loading-step__dot"></div>
+      Scanning for hiring risk signals
+    </li>
+    <li class="loading-step" id="step3">
+      <div class="loading-step__dot"></div>
+      Injecting real-time market intelligence
+    </li>
+    <li class="loading-step" id="step4">
+      <div class="loading-step__dot"></div>
+      Generating personalized discussion topics
+    </li>
+    <li class="loading-step" id="step5">
+      <div class="loading-step__dot"></div>
+      Building your question bank
+    </li>
+    <li class="loading-step" id="step6">
+      <div class="loading-step__dot"></div>
+      Running quality check on your pack
+    </li>
+    <li class="loading-step" id="step7">
+      <div class="loading-step__dot"></div>
+      Finalizing your prep pack
+    </li>
+  </ul>
+
+  <!-- Hidden form that auto-submits to trigger processing -->
+  <form id="processForm" method="GET" action="/process" style="display:none;">
+  </form>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const steps = ['step1','step2','step3','step4','step5','step6','step7'];
+  let current = 0;
+
+  // Animate steps
+  function animateStep() {
+    if (current > 0) {
+      document.getElementById(steps[current-1]).classList.remove('active');
+      document.getElementById(steps[current-1]).classList.add('done');
+    }
+    if (current < steps.length) {
+      document.getElementById(steps[current]).classList.add('active');
+      current++;
+      setTimeout(animateStep, 900);
+    }
+  }
+
+  // Start animation immediately
+  animateStep();
+
+  // Submit the processing form after brief delay
+  // (gives animation time to start)
+  setTimeout(function() {
+    document.getElementById('processForm').submit();
+  }, 500);
+</script>
+{% endblock %}

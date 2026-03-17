@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% block title %}PrepMate — Recruiter Pre-Session Brief{% endblock %}
+
+{% block content %}
+<div class="container" style="padding: 48px 24px;">
+
+  <!-- Header -->
+  <div style="margin-bottom:32px;">
+    <span class="badge badge--purple">Recruiter View Only</span>
+    <h1 style="font-size:28px; margin-top:12px; margin-bottom:6px;">
+      Pre-Session Intelligence Brief
+    </h1>
+    <p style="color:var(--subtle); font-size:14px;">
+      Prepared by PrepMate for
+      {% if profile %}
+        <strong style="color:var(--text);">{{ profile.recruiter_name or 'the Recruiter' }}</strong>
+        &nbsp;·&nbsp; Candidate:
+        <strong style="color:var(--accent);">{{ profile.name }}</strong>
+        &nbsp;·&nbsp;
+        <strong style="color:var(--text);">{{ profile.target_role }}</strong>
+      {% endif %}
+    </p>
+  </div>
+
+  <!-- Candidate Snapshot -->
+  {% if profile %}
+  <div class="card card--accent mb-24">
+    <h3 style="font-size:15px; margin-bottom:16px; color:var(--accent);">
+      👤 Candidate Snapshot
+    </h3>
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(160px,1fr)); gap:16px;">
+      <div>
+        <div style="font-size:11px; color:var(--muted); letter-spacing:1px; margin-bottom:4px;">CAREER STAGE</div>
+        <div style="font-weight:600; font-size:14px;">{{ profile.career_stage }}</div>
+      </div>
+      <div>
+        <div style="font-size:11px; color:var(--muted); letter-spacing:1px; margin-bottom:4px;">TARGET ROLE</div>
+        <div style="font-weight:600; font-size:14px;">{{ profile.target_role }}</div>
+      </div>
+      <div>
+        <div style="font-size:11px; color:var(--muted); letter-spacing:1px; margin-bottom:4px;">LOCATION</div>
+        <div style="font-weight:600; font-size:14px;">{{ profile.target_location }}</div>
+      </div>
+      {% if profile.cv_score %}
+      <div>
+        <div style="font-size:11px; color:var(--muted); letter-spacing:1px; margin-bottom:4px;">CV SCORE</div>
+        <div style="font-weight:600; font-size:14px;">
+          {{ profile.cv_score }}/100
+          {% if profile.cv_score|int < 75 %}
+            <span class="badge badge--red" style="margin-left:6px;">Below Threshold</span>
+          {% else %}
+            <span class="badge badge--green" style="margin-left:6px;">Above Threshold</span>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+      {% if profile.applications_sent %}
+      <div>
+        <div style="font-size:11px; color:var(--muted); letter-spacing:1px; margin-bottom:4px;">APPLICATION MOMENTUM</div>
+        <div style="font-weight:600; font-size:14px;">
+          {{ profile.applications_sent }} sent · {{ profile.responses_received }} responses
+          {% if profile.responses_received|int == 0 and profile.applications_sent|int > 3 %}
+            <span class="badge badge--red" style="margin-left:6px;">⚠ Flagged</span>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Risk Signals -->
+  {% if risk_signals and risk_signals.risk_signals %}
+  <div class="card mb-24">
+    <div class="flex-between mb-16">
+      <h3 style="font-size:15px;">⚠️ Hiring Risk Signals Detected</h3>
+      <span class="badge badge--{% if risk_signals.overall_risk_level == 'high' %}red{% elif risk_signals.overall_risk_level == 'medium' %}gold{% else %}green{% endif %}">
+        {{ risk_signals.overall_risk_level|title }} Risk
+      </span>
+    </div>
+
+    {% if risk_signals.priority_focus %}
+      <div style="padding:12px 16px; background:rgba(239,68,68,0.08);
+                  border:1px solid rgba(239,68,68,0.2); border-radius:var(--radius);
+                  margin-bottom:20px; font-size:14px;">
+        <span style="color:var(--red); font-weight:600;">🎯 Priority Focus: </span>
+        {{ risk_signals.priority_focus }}
+      </div>
+    {% endif %}
+
+    {% for signal in risk_signals.risk_signals %}
+      <div class="risk-item">
+        <div class="risk-item__icon risk-item__icon--{{ signal.severity }}">
+          {% if signal.severity == 'high' %}🔴{% elif signal.severity == 'medium' %}🟡{% else %}🟢{% endif %}
+        </div>
+        <div class="risk-item__content">
+          <div class="risk-item__signal">
+            {{ signal.signal }}
+            <span class="badge badge--{% if signal.severity == 'high' %}red{% elif signal.severity == 'medium' %}gold{% else %}green{% endif %}" style="margin-left:8px;">{{ signal.severity|title }}</span>
+          </div>
+          <div class="risk-item__evidence">{{ signal.evidence }}</div>
+          {% if signal.recruiter_note %}
+            <div style="margin-top:6px; font-size:12px; color:var(--accent);">
+              💬 {{ signal.recruiter_note }}
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Session Agenda -->
+  {% if prep_pack and prep_pack.session_agenda %}
+  <div class="card mb-24">
+    <h3 style="font-size:15px; margin-bottom:16px;">🗓 Suggested Session Agenda</h3>
+    {% for item in prep_pack.session_agenda %}
+      <div class="agenda-item">
+        <div class="agenda-num">{{ item.order }}</div>
+        <div class="agenda-focus">{{ item.focus }}</div>
+        {% if item.time %}
+          <div class="agenda-time">{{ item.time }}</div>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Top Discussion Topics -->
+  {% if prep_pack and prep_pack.discussion_topics %}
+  <div class="card mb-24">
+    <h3 style="font-size:15px; margin-bottom:16px;">📋 Key Topics to Address</h3>
+    {% for topic in prep_pack.discussion_topics[:3] %}
+      <div class="topic-item">
+        <div class="topic-num">{{ loop.index }}</div>
+        <div class="topic-content">
+          <div class="topic-content__title">{{ topic.topic }}</div>
+          <div class="topic-content__why">{{ topic.why }}</div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Disclaimer -->
+  <div style="padding:16px; background:var(--bg2); border-radius:var(--radius);
+              font-size:12px; color:var(--muted); text-align:center; margin-top:24px;">
+    This brief contains a sanitized summary only. Raw CV and full diagnostic data
+    are not included. Generated by PrepMate · JSO Phase-2 Agentic Career Intelligence.
+  </div>
+
+  <div style="margin-top:20px; text-align:center;">
+    <a href="/preppack" class="btn btn--outline">← Back to Prep Pack</a>
+  </div>
+
+</div>
+{% endblock %}

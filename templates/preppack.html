@@ -1,0 +1,308 @@
+{% extends "base.html" %}
+{% block title %}PrepMate — Your Consultation Prep Pack{% endblock %}
+{% block step4 %}active{% endblock %}
+
+{% block content %}
+<div class="container--wide" style="padding: 48px 24px;">
+
+  <!-- Header -->
+  <div style="display:flex; justify-content:space-between; align-items:flex-start;
+              flex-wrap:wrap; gap:16px; margin-bottom:32px;">
+    <div>
+      <div style="margin-bottom:8px;">
+        <span class="badge badge--green">✓ Prep Pack Ready</span>
+        {% if quality_result %}
+          <span class="badge badge--blue" style="margin-left:8px;">
+            Quality Score: {{ quality_result.overall_quality_score }}/10
+          </span>
+        {% endif %}
+      </div>
+      <h1 style="font-size:28px; margin-bottom:6px;">
+        Your Consultation Prep Pack
+      </h1>
+      <p style="color:var(--subtle); font-size:14px;">
+        Prepared for
+        <strong style="color:var(--text);">{{ profile.name }}</strong>
+        &nbsp;·&nbsp;
+        Target: <strong style="color:var(--accent);">{{ profile.target_role }}</strong>
+        {% if profile.session_date %}
+          &nbsp;·&nbsp; Session: <strong style="color:var(--text);">{{ profile.session_date }}</strong>
+        {% endif %}
+      </p>
+    </div>
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <a href="/recruiter" class="btn btn--outline" target="_blank">
+        👤 Recruiter Brief
+      </a>
+      <a href="/download" class="btn btn--gold">
+        ⬇ Download PDF
+      </a>
+    </div>
+  </div>
+
+  <!-- Profile Summary Chips -->
+  <div class="profile-summary">
+    <div class="profile-chip">Stage <span>{{ profile.career_stage }}</span></div>
+    <div class="profile-chip">Location <span>{{ profile.target_location }}</span></div>
+    {% if profile.cv_score %}
+      <div class="profile-chip">CV Score <span>{{ profile.cv_score }}/100</span></div>
+    {% endif %}
+    {% if profile.applications_sent %}
+      <div class="profile-chip">Applications <span>{{ profile.applications_sent }} sent · {{ profile.responses_received }} responses</span></div>
+    {% endif %}
+    <div class="profile-chip">Intent <span>{{ intent[:40] }}...</span></div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('topics', this)">📋 Discussion Topics</button>
+    <button class="tab-btn" onclick="switchTab('questions', this)">❓ Question Bank</button>
+    <button class="tab-btn" onclick="switchTab('interview', this)">🎤 Interview Prep</button>
+    <button class="tab-btn" onclick="switchTab('market', this)">📡 Market Pulse</button>
+    <button class="tab-btn" onclick="switchTab('brief', this)">🗣 Your Pitch</button>
+    <button class="tab-btn" onclick="switchTab('agenda', this)">🗓 Session Agenda</button>
+  </div>
+
+  <!-- TAB: Discussion Topics -->
+  <div class="tab-pane active" id="tab-topics">
+    <div class="card">
+      <div class="flex-between mb-16">
+        <h3 style="font-size:16px;">Top Discussion Topics</h3>
+        <span class="badge badge--blue">
+          {{ prep_pack.discussion_topics|length if prep_pack and prep_pack.discussion_topics else 0 }} Topics
+        </span>
+      </div>
+      {% if prep_pack and prep_pack.discussion_topics %}
+        {% for topic in prep_pack.discussion_topics %}
+          <div class="topic-item">
+            <div class="topic-num">{{ loop.index }}</div>
+            <div class="topic-content">
+              <div class="topic-content__title">{{ topic.topic }}</div>
+              <div class="topic-content__why">{{ topic.why }}</div>
+              {% if topic.data_reference %}
+                <div style="margin-top:6px;">
+                  <span style="font-size:11px; color:var(--muted);">
+                    📊 Based on: {{ topic.data_reference }}
+                  </span>
+                </div>
+              {% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      {% else %}
+        <p style="color:var(--muted); font-size:14px;">No topics generated.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- TAB: Question Bank -->
+  <div class="tab-pane" id="tab-questions">
+    <div class="card">
+      <div class="flex-between mb-16">
+        <h3 style="font-size:16px;">Your Question Bank</h3>
+        <span class="badge badge--blue">
+          {{ prep_pack.question_bank|length if prep_pack and prep_pack.question_bank else 0 }} Questions
+        </span>
+      </div>
+
+      {% if quality_result and quality_result.flags %}
+        <div style="background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.2);
+                    border-radius:var(--radius); padding:12px 16px; margin-bottom:20px;">
+          <div style="font-size:13px; color:var(--gold); font-weight:600; margin-bottom:4px;">
+            ⚡ Quality Check: {{ quality_result.quality_summary }}
+          </div>
+          <div style="font-size:12px; color:var(--subtle);">
+            {{ quality_result.flags|length }} improvement{{ 's' if quality_result.flags|length != 1 }} flagged below
+          </div>
+        </div>
+      {% endif %}
+
+      {% if prep_pack and prep_pack.question_bank %}
+        {% for q in prep_pack.question_bank %}
+          <div class="question-item">
+            <div class="question-item__cat">{{ q.category }}</div>
+            <div>{{ q.id }}. {{ q.question }}</div>
+            {% if quality_result and quality_result.flags %}
+              {% for flag in quality_result.flags %}
+                {% if flag.question_id == q.id %}
+                  <div style="margin-top:8px; padding:8px 12px; background:rgba(245,158,11,0.06);
+                              border-radius:8px; font-size:12px; color:var(--gold);">
+                    ⚡ {{ flag.issue }}<br/>
+                    <span style="color:var(--green);">
+                      ✓ Suggested: {{ flag.improved_version }}
+                    </span>
+                  </div>
+                {% endif %}
+              {% endfor %}
+            {% endif %}
+          </div>
+        {% endfor %}
+      {% else %}
+        <p style="color:var(--muted); font-size:14px;">No questions generated.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- TAB: Interview Prep -->
+  <div class="tab-pane" id="tab-interview">
+    <div class="card">
+      <div class="flex-between mb-16">
+        <h3 style="font-size:16px;">Interview Articulation Prep</h3>
+        <span class="badge badge--green">
+          {{ prep_pack.interview_prep|length if prep_pack and prep_pack.interview_prep else 0 }} Tips
+        </span>
+      </div>
+      {% if prep_pack and prep_pack.interview_prep %}
+        {% for tip in prep_pack.interview_prep %}
+          <div class="tip-item">
+            <div>{{ tip.tip }}</div>
+            {% if tip.role_relevance %}
+              <div class="tip-item__relevance">→ {{ tip.role_relevance }}</div>
+            {% endif %}
+          </div>
+        {% endfor %}
+      {% else %}
+        <p style="color:var(--muted); font-size:14px;">No interview tips generated.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- TAB: Market Pulse -->
+  <div class="tab-pane" id="tab-market">
+    <div class="card">
+      <div class="flex-between mb-16">
+        <h3 style="font-size:16px;">📡 Market Pulse</h3>
+        <span class="badge badge--purple">Real-time Intelligence</span>
+      </div>
+
+      {% if market_pulse %}
+        {% if market_pulse.market_summary %}
+          <div style="padding:16px; background:var(--bg2); border-radius:var(--radius);
+                      margin-bottom:20px; font-size:14px; line-height:1.7; color:var(--subtle);">
+            {{ market_pulse.market_summary }}
+          </div>
+        {% endif %}
+
+        {% if market_pulse.trending_skills %}
+          <h4 style="font-size:14px; margin-bottom:12px; color:var(--subtle);">Trending Skills</h4>
+          {% for skill in market_pulse.trending_skills %}
+            <div class="pulse-skill">
+              <span>{{ skill.skill }}</span>
+              <div style="display:flex; gap:12px; align-items:center;">
+                <span style="font-size:12px; color:var(--subtle);">{{ skill.relevance }}</span>
+                <div class="pulse-trend trend--{{ skill.trend }}">
+                  {% if skill.trend == 'rising' %}↑{% elif skill.trend == 'declining' %}↓{% else %}→{% endif %}
+                  {{ skill.trend|title }}
+                </div>
+              </div>
+            </div>
+          {% endfor %}
+        {% endif %}
+
+        {% if market_pulse.market_advice %}
+          <div style="margin-top:20px; padding:14px 16px;
+                      background:rgba(139,92,246,0.08);
+                      border:1px solid rgba(139,92,246,0.2);
+                      border-radius:var(--radius); font-size:14px;">
+            <span style="color:var(--purple); font-weight:600;">💡 Market Advice: </span>
+            {{ market_pulse.market_advice }}
+          </div>
+        {% endif %}
+
+        {% if market_pulse.hiring_activity %}
+          <div style="margin-top:12px;">
+            <span style="font-size:13px; color:var(--subtle);">Hiring Activity: </span>
+            <span class="badge badge--{% if market_pulse.hiring_activity == 'high' %}green{% elif market_pulse.hiring_activity == 'medium' %}gold{% else %}red{% endif %}">
+              {{ market_pulse.hiring_activity|title }}
+            </span>
+          </div>
+        {% endif %}
+      {% else %}
+        <p style="color:var(--muted); font-size:14px;">Market data unavailable.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- TAB: Positioning Brief -->
+  <div class="tab-pane" id="tab-brief">
+    <div class="card">
+      <div class="flex-between mb-16">
+        <h3 style="font-size:16px;">Your 90-Second Positioning Brief</h3>
+        <span class="badge badge--gold">Say This First</span>
+      </div>
+      <p style="font-size:13px; color:var(--subtle); margin-bottom:16px;">
+        Use this to introduce yourself at the start of your session.
+        It gives your recruiter instant context and sets a focused tone.
+      </p>
+      {% if prep_pack and prep_pack.positioning_brief %}
+        <div class="brief-box">
+          "{{ prep_pack.positioning_brief }}"
+        </div>
+      {% else %}
+        <p style="color:var(--muted); font-size:14px;">No brief generated.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- TAB: Session Agenda -->
+  <div class="tab-pane" id="tab-agenda">
+    <div class="card">
+      <div class="flex-between mb-16">
+        <h3 style="font-size:16px;">Suggested Session Agenda</h3>
+        <span class="badge badge--blue">
+          {% if prep_pack and prep_pack.session_agenda %}
+            {{ prep_pack.session_agenda|length }} Items
+          {% endif %}
+        </span>
+      </div>
+      {% if prep_pack and prep_pack.session_agenda %}
+        {% for item in prep_pack.session_agenda %}
+          <div class="agenda-item">
+            <div class="agenda-num">{{ item.order }}</div>
+            <div class="agenda-focus">{{ item.focus }}</div>
+            {% if item.time %}
+              <div class="agenda-time">{{ item.time }}</div>
+            {% endif %}
+          </div>
+        {% endfor %}
+      {% else %}
+        <p style="color:var(--muted); font-size:14px;">No agenda generated.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Download CTA -->
+  <div style="margin-top:32px; padding:24px; background:var(--bg2);
+              border:1px solid var(--border); border-radius:var(--radius-lg);
+              display:flex; justify-content:space-between; align-items:center;
+              flex-wrap:wrap; gap:16px;">
+    <div>
+      <div style="font-family:'Syne',sans-serif; font-weight:700; margin-bottom:4px;">
+        Ready for your session?
+      </div>
+      <div style="font-size:13px; color:var(--subtle);">
+        Download your prep pack as a PDF to review offline or share with your recruiter.
+      </div>
+    </div>
+    <div style="display:flex; gap:10px;">
+      <a href="/recruiter" class="btn btn--outline" target="_blank">View Recruiter Brief</a>
+      <a href="/download" class="btn btn--gold">⬇ Download PDF</a>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function switchTab(tabName, btn) {
+    // Hide all panes
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+
+    // Show selected
+    document.getElementById('tab-' + tabName).classList.add('active');
+    btn.classList.add('active');
+  }
+</script>
+{% endblock %}
