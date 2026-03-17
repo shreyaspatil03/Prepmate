@@ -1,5 +1,5 @@
 from flask import (Flask, render_template, request,
-                   session, redirect, url_for, send_file)
+                   session, redirect, url_for, send_file, jsonify)
 from gemini import (run_risk_signal_detector,
                     run_market_pulse,
                     run_pack_generator,
@@ -8,7 +8,7 @@ from pdf_generator import generate_pdf
 from supabase import create_client, Client
 from dotenv import load_dotenv
 import os
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
 import uuid
 import tempfile
 import PyPDF2
@@ -179,53 +179,105 @@ def loading():
 
 
 # ─────────────────────────────────────────
-# ROUTE 5 — Processing (Gemini API calls)
+# BACKGROUND WORKER
 # ─────────────────────────────────────────
-@app.route("/process")
-def process():
+def _run_gemini_background(sid, profile, cv_text, intent):
+    """Runs all Gemini calls in a daemon thread — never blocks HTTP workers."""
+    try:
+        # Mark processing started
+        save_all(sid, {"status": "processing"})
+
+        # Calls 1 & 2 are independent — run in parallel
+        results = {}
+
+        def _risk():
+            results["risk"] = run_risk_signal_detector(profile, cv_text)
+
+        def _market():
+            results["market"] = run_market_pulse(profile)
+
+        t1 = threading.Thread(target=_risk)
+        t2 = threading.Thread(target=_market)
+        t1.start()
+        t2.start()
+        t1.join()
+        t2.join()
+
+        risk_signals = results.get("risk", {})
+        market_pulse = results.get("market", {})
+
+        # Calls 3 & 4 depend on the above
+        prep_pack = run_pack_generator(
+            profile, cv_text, intent, risk_signals, market_pulse
+        )
+        quality_result = run_quality_checker(profile, prep_pack, intent)
+
+        # Auto-fix flagged questions
+        prep_pack, quality_result = apply_quality_fixes(prep_pack, quality_result)
+
+        # Persist everything + mark done
+        save_all(sid, {
+            "risk_signals": risk_signals,
+            "market_pulse": market_pulse,
+            "prep_pack": prep_pack,
+            "quality_result": quality_result,
+            "status": "done"
+        })
+    except Exception as e:
+        print(f"Background processing error: {e}")
+        save_all(sid, {"status": "error"})
+
+
+# ─────────────────────────────────────────
+# ROUTE 5 — Start Processing (non-blocking)
+# ─────────────────────────────────────────
+@app.route("/start-processing")
+def start_processing():
+    """Kicks off background Gemini work and returns immediately."""
     if not session.get("has_profile"):
-        return redirect(url_for("upload"))
+        return jsonify({"error": "no_profile"}), 400
 
     sid = get_session_id()
-
-    # Load all data in one Supabase query
     row = load_all(sid)
     profile = row.get("profile")
     cv_text = row.get("cv_text") or ""
     intent = row.get("intent") or "Build my overall job search strategy"
 
     if not profile:
-        return redirect(url_for("upload"))
+        return jsonify({"error": "no_profile"}), 400
 
-    # Step 1 — Run first two independent Gemini calls in parallel
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        future_risk = executor.submit(run_risk_signal_detector, profile, cv_text)
-        future_market = executor.submit(run_market_pulse, profile)
-        risk_signals = future_risk.result()
-        market_pulse = future_market.result()
+    # Don't re-start if already running or done
+    current_status = row.get("status")
+    if current_status in ("processing", "done"):
+        return jsonify({"status": current_status})
 
-    # Step 2 — Run dependent calls sequentially
-    prep_pack = run_pack_generator(
-        profile, cv_text, intent,
-        risk_signals, market_pulse
+    t = threading.Thread(
+        target=_run_gemini_background,
+        args=(sid, profile, cv_text, intent),
+        daemon=True
     )
-    quality_result = run_quality_checker(profile, prep_pack, intent)
+    t.start()
+    return jsonify({"status": "started"})
 
-    # Step 3 — Auto-replace flagged questions
-    prep_pack, quality_result = apply_quality_fixes(
-        prep_pack, quality_result
-    )
 
-    # Step 4 — Save all results in one Supabase query
-    save_all(sid, {
-        "risk_signals": risk_signals,
-        "market_pulse": market_pulse,
-        "prep_pack": prep_pack,
-        "quality_result": quality_result
-    })
+# ─────────────────────────────────────────
+# ROUTE 5b — Status Polling
+# ─────────────────────────────────────────
+@app.route("/status")
+def status():
+    """Polled by the loading page every 2 s to check if results are ready."""
+    if not session.get("has_profile"):
+        return jsonify({"status": "no_session"})
 
-    session["has_results"] = True
-    return redirect(url_for("preppack"))
+    sid = get_session_id()
+    row = load_all(sid)
+    current_status = row.get("status", "idle")
+
+    if current_status == "done":
+        session["has_results"] = True
+        return jsonify({"status": "done", "redirect": url_for("preppack")})
+
+    return jsonify({"status": current_status})
 
 
 # ─────────────────────────────────────────

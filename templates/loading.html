@@ -49,9 +49,9 @@
     </li>
   </ul>
 
-  <!-- Hidden form that auto-submits to trigger processing -->
-  <form id="processForm" method="GET" action="/process" style="display:none;">
-  </form>
+  <p id="errorMsg" style="display:none; color:#e55; margin-top:16px; font-size:14px;">
+    Something went wrong. Please <a href="/upload">start again</a>.
+  </p>
 
 </div>
 {% endblock %}
@@ -61,11 +61,11 @@
   const steps = ['step1','step2','step3','step4','step5','step6','step7'];
   let current = 0;
 
-  // Animate steps
+  // Animate steps on a loop so it keeps cycling while we wait
   function animateStep() {
     if (current > 0) {
-      document.getElementById(steps[current-1]).classList.remove('active');
-      document.getElementById(steps[current-1]).classList.add('done');
+      document.getElementById(steps[current - 1]).classList.remove('active');
+      document.getElementById(steps[current - 1]).classList.add('done');
     }
     if (current < steps.length) {
       document.getElementById(steps[current]).classList.add('active');
@@ -73,14 +73,38 @@
       setTimeout(animateStep, 900);
     }
   }
-
-  // Start animation immediately
   animateStep();
 
-  // Submit the processing form after brief delay
-  // (gives animation time to start)
-  setTimeout(function() {
-    document.getElementById('processForm').submit();
-  }, 500);
+  // 1. Kick off background processing immediately (returns in ~ms)
+  fetch('/start-processing')
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) {
+        document.getElementById('errorMsg').style.display = 'block';
+        return;
+      }
+      // 2. Poll every 2 s until done
+      pollStatus();
+    })
+    .catch(() => {
+      document.getElementById('errorMsg').style.display = 'block';
+    });
+
+  function pollStatus() {
+    setTimeout(function check() {
+      fetch('/status')
+        .then(r => r.json())
+        .then(data => {
+          if (data.status === 'done' && data.redirect) {
+            window.location.href = data.redirect;
+          } else if (data.status === 'error') {
+            document.getElementById('errorMsg').style.display = 'block';
+          } else {
+            setTimeout(check, 2000); // keep polling
+          }
+        })
+        .catch(() => setTimeout(check, 3000));
+    }, 2000);
+  }
 </script>
 {% endblock %}
