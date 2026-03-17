@@ -8,6 +8,7 @@ from pdf_generator import generate_pdf
 from supabase import create_client, Client
 from dotenv import load_dotenv
 import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import uuid
 import tempfile
 import PyPDF2
@@ -196,21 +197,26 @@ def process():
     if not profile:
         return redirect(url_for("upload"))
 
-    # Step 1 — Run all 4 Gemini API calls
-    risk_signals = run_risk_signal_detector(profile, cv_text)
-    market_pulse = run_market_pulse(profile)
+    # Step 1 — Run first two independent Gemini calls in parallel
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        future_risk = executor.submit(run_risk_signal_detector, profile, cv_text)
+        future_market = executor.submit(run_market_pulse, profile)
+        risk_signals = future_risk.result()
+        market_pulse = future_market.result()
+
+    # Step 2 — Run dependent calls sequentially
     prep_pack = run_pack_generator(
         profile, cv_text, intent,
         risk_signals, market_pulse
     )
     quality_result = run_quality_checker(profile, prep_pack, intent)
 
-    # Step 2 — Auto-replace flagged questions
+    # Step 3 — Auto-replace flagged questions
     prep_pack, quality_result = apply_quality_fixes(
         prep_pack, quality_result
     )
 
-    # Step 3 — Save all results in one Supabase query
+    # Step 4 — Save all results in one Supabase query
     save_all(sid, {
         "risk_signals": risk_signals,
         "market_pulse": market_pulse,
